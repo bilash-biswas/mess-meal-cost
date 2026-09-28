@@ -1,0 +1,18 @@
+{
+  "name": "MessCost — Simple Mess হিসাব",
+  "short_name": "MessCost",
+  "description": "Simple Mess হিসাব, Shared by Everyone. মেসের হিসাব, সহজেই সবার জন্য।",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#059669",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

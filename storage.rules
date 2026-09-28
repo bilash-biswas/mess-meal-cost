@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function memberDoc(messId) {
+      return firestore.get(/databases/(default)/documents/messes/$(messId)/members/$(request.auth.uid));
+    }
+
+    function isMember(messId) {
+      return isAuthenticated() &&
+        firestore.exists(/databases/(default)/documents/messes/$(messId)/members/$(request.auth.uid)) &&
+        memberDoc(messId).data.isActive != false;
+    }
+
+    function canManage(messId) {
+      return isMember(messId) &&
+        (memberDoc(messId).data.role == 'owner' || memberDoc(messId).data.role == 'admin');
+    }
+
+    function isValidReceiptImage() {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
+    }
+
+    // Store receipts strictly under: receipts/{messId}/{monthId}/{expenseId}
+    match /receipts/{messId}/{monthId}/{expenseId} {
+      // Only authenticated members of this specific mess can view receipts
+      allow read: if isMember(messId);
+
+      // Only Owner/Admin of this mess can upload a valid image <= 5 MB
+      allow create, update: if canManage(messId) && isValidReceiptImage();
+
+      // Only Owner/Admin can delete a receipt
+      allow delete: if canManage(messId);
+    }
+
+    // Deny all other paths by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

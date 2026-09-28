@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <rect width="128" height="128" rx="28" fill="#059669"/>
+  <path d="M34 44C34 38.4772 38.4772 34 44 34H84C89.5228 34 94 38.4772 94 44V84C94 89.5228 89.5228 94 84 94H44C38.4772 94 34 89.5228 34 84V44Z" fill="#047857"/>
+  <text x="64" y="79" font-family="system-ui, sans-serif" font-size="52" font-weight="800" fill="#ffffff" text-anchor="middle">৳</text>
+</svg>

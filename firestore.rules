@@ -1,0 +1,189 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // Helper Functions (Section 27)
+    // =========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isSelf(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function memberPath(messId, uid) {
+      return /databases/$(database)/documents/messes/$(messId)/members/$(uid);
+    }
+
+    function monthPath(messId, monthId) {
+      return /databases/$(database)/documents/messes/$(messId)/months/$(monthId);
+    }
+
+    function isMember(messId) {
+      return isAuthenticated() &&
+        exists(memberPath(messId, request.auth.uid)) &&
+        get(memberPath(messId, request.auth.uid)).data.isActive != false;
+    }
+
+    function getMemberRole(messId) {
+      return get(memberPath(messId, request.auth.uid)).data.role;
+    }
+
+    function isOwner(messId) {
+      return isMember(messId) && getMemberRole(messId) == 'owner';
+    }
+
+    function isAdmin(messId) {
+      return isMember(messId) && getMemberRole(messId) == 'admin';
+    }
+
+    function canManage(messId) {
+      return isMember(messId) &&
+        (getMemberRole(messId) == 'owner' || getMemberRole(messId) == 'admin');
+    }
+
+    function isMonthOpen(messId, monthId) {
+      return !exists(monthPath(messId, monthId)) ||
+        get(monthPath(messId, monthId)).data.status != 'closed';
+    }
+
+    // =========================================================================
+    // 1. Users Collection: users/{userId}
+    // =========================================================================
+    match /users/{userId} {
+      allow read: if isSelf(userId);
+      allow create: if isSelf(userId)
+        && request.resource.data.uid == userId
+        && request.resource.data.email is string;
+      allow update: if isSelf(userId)
+        && request.resource.data.uid == userId;
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 2. Messes Collection: messes/{messId}
+    // =========================================================================
+    match /messes/{messId} {
+      // Members can read their mess; authenticated users can lookup mess header by inviteCode to preview before joining
+      allow get, list: if isAuthenticated();
+
+      // Any authenticated user can create a new mess where they are ownerId
+      allow create: if isAuthenticated()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2;
+
+      // Owner can update mess settings; joining user can increment memberCount
+      allow update: if isOwner(messId) ||
+        (isAuthenticated() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt']));
+
+      // Only the owner can delete the mess
+      allow delete: if isOwner(messId);
+
+      // -----------------------------------------------------------------------
+      // 2a. Members Subcollection: messes/{messId}/members/{memberId}
+      // -----------------------------------------------------------------------
+      match /members/{memberId} {
+        // Strict tenant isolation: only members of this mess (or the user checking their own membership) can read
+        allow read: if isMember(messId) || isSelf(memberId);
+
+        // Creating a member doc:
+        // 1. Owner creating initial owner membership on mess creation
+        // 2. Authenticated user joining via invite code as 'member' for themselves
+        allow create: if isSelf(memberId) && (
+          (request.resource.data.role == 'owner' &&
+            getAfter(/databases/$(database)/documents/messes/$(messId)).data.ownerId == request.auth.uid) ||
+          (request.resource.data.role == 'member' &&
+            request.resource.data.uid == request.auth.uid &&
+            request.resource.data.messId == messId)
+        );
+
+        // Only Owner can change member roles (and cannot demote owner)
+        allow update: if isOwner(messId)
+          && resource.data.role != 'owner'
+          && request.resource.data.role in ['admin', 'member'];
+
+        // Only Owner can remove a non-owner member
+        allow delete: if isOwner(messId) && resource.data.role != 'owner';
+      }
+
+      // -----------------------------------------------------------------------
+      // 2b. Months Subcollection: messes/{messId}/months/{monthId}
+      // -----------------------------------------------------------------------
+      match /months/{monthId} {
+        allow read: if isMember(messId);
+        allow create: if isMember(messId);
+        // Only Owner or Admin can close, reopen, or configure custom splits
+        allow update: if canManage(messId);
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // 2c. Meals Subcollection: messes/{messId}/meals/{mealId}
+      // -----------------------------------------------------------------------
+      match /meals/{mealId} {
+        allow read: if isMember(messId);
+
+        // Writing meals requires open month AND (Owner/Admin OR Member editing own meal when allowed)
+        allow create, update: if isMember(messId)
+          && isMonthOpen(messId, request.resource.data.monthId)
+          && request.resource.data.breakfast >= 0
+          && request.resource.data.lunch >= 0
+          && request.resource.data.dinner >= 0
+          && (
+            canManage(messId) ||
+            (request.resource.data.userId == request.auth.uid &&
+              get(/databases/$(database)/documents/messes/$(messId)).data.allowMemberMealEntry == true)
+          );
+
+        allow delete: if canManage(messId)
+          && isMonthOpen(messId, resource.data.monthId);
+      }
+
+      // -----------------------------------------------------------------------
+      // 2d. Expenses Subcollection: messes/{messId}/expenses/{expenseId}
+      // -----------------------------------------------------------------------
+      match /expenses/{expenseId} {
+        allow read: if isMember(messId);
+
+        // Any active member can add an expense they paid for (paidBy == request.auth.uid), or Owner/Admin can manage
+        allow create, update: if isMember(messId)
+          && isMonthOpen(messId, request.resource.data.monthId)
+          && request.resource.data.amount > 0
+          && request.resource.data.expenseType in ['meal', 'other']
+          && (canManage(messId) || request.resource.data.paidBy == request.auth.uid);
+
+        allow delete: if isMonthOpen(messId, resource.data.monthId)
+          && (canManage(messId) || resource.data.paidBy == request.auth.uid);
+      }
+
+      // -----------------------------------------------------------------------
+      // 2e. Payments Subcollection: messes/{messId}/payments/{paymentId}
+      // -----------------------------------------------------------------------
+      match /payments/{paymentId} {
+        allow read: if isMember(messId);
+
+        allow create, update: if canManage(messId)
+          && isMonthOpen(messId, request.resource.data.monthId)
+          && request.resource.data.amount > 0
+          && request.resource.data.method in ['cash', 'bank_transfer', 'mobile_banking', 'other'];
+
+        allow delete: if canManage(messId)
+          && isMonthOpen(messId, resource.data.monthId);
+      }
+
+      // -----------------------------------------------------------------------
+      // 2f. Invitations Subcollection: messes/{messId}/invitations/{invitationId}
+      // -----------------------------------------------------------------------
+      match /invitations/{invitationId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if canManage(messId);
+      }
+    }
+  }
+}
