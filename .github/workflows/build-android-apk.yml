@@ -29,15 +29,20 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Gradle 8.5
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.5"
+
+      - name: Accept Pre-installed Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Create Lightweight Native Android WebView Wrapper Project
         env:
           APP_URL: ${{ github.event.inputs.app_url || vars.NEXT_PUBLIC_APP_URL || 'https://messcost-bd.vercel.app' }}
         run: |
           mkdir -p android-app/app/src/main/java/com/messcost/bd
-          mkdir -p android-app/app/src/main/res/layout
           mkdir -p android-app/app/src/main/res/values
 
           cat << 'EOF' > android-app/settings.gradle
@@ -171,11 +176,13 @@ jobs:
           }
           EOF
 
+          # Strip leading spaces from XML header so Android aapt2 parses cleanly
+          sed -i 's/^[[:space:]]*<?xml/<?xml/' android-app/app/src/main/AndroidManifest.xml
+
       - name: Build Signed Debug APK with Gradle
         working-directory: android-app
         run: |
-          gradle wrapper --gradle-version 8.5
-          ./gradlew assembleDebug
+          gradle assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk ../MessCost.apk
 
       - name: Upload APK Artifact
