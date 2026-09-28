@@ -99,41 +99,45 @@ export async function ensureUserDocument(
 
   if (!db) return defaultProfile;
 
-  const userRef = doc(db, "users", fbUser.uid);
-  const snap = await getDoc(userRef);
+  try {
+    const userRef = doc(db, "users", fbUser.uid);
+    const snap = await getDoc(userRef);
 
-  if (!snap.exists()) {
-    await setDoc(userRef, {
+    if (!snap.exists()) {
+      await setDoc(userRef, {
+        uid: fbUser.uid,
+        name: defaultProfile.name,
+        email: defaultProfile.email,
+        photoURL: defaultProfile.photoURL || null,
+        activeMessId: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return defaultProfile;
+    }
+
+    const data = snap.data();
+    const updatedName = overrideName || data.name || defaultProfile.name;
+
+    if (overrideName && data.name !== overrideName) {
+      await updateDoc(userRef, {
+        name: overrideName,
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    return {
       uid: fbUser.uid,
-      name: defaultProfile.name,
-      email: defaultProfile.email,
-      photoURL: defaultProfile.photoURL || null,
-      activeMessId: null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+      name: updatedName,
+      email: data.email || defaultProfile.email,
+      photoURL: data.photoURL || fbUser.photoURL || undefined,
+      activeMessId: data.activeMessId ?? null,
+      createdAt: convertTimestamp(data.createdAt),
+      updatedAt: convertTimestamp(data.updatedAt),
+    };
+  } catch {
     return defaultProfile;
   }
-
-  const data = snap.data();
-  const updatedName = overrideName || data.name || defaultProfile.name;
-
-  if (overrideName && data.name !== overrideName) {
-    await updateDoc(userRef, {
-      name: overrideName,
-      updatedAt: serverTimestamp(),
-    });
-  }
-
-  return {
-    uid: fbUser.uid,
-    name: updatedName,
-    email: data.email || defaultProfile.email,
-    photoURL: data.photoURL || fbUser.photoURL || undefined,
-    activeMessId: data.activeMessId ?? null,
-    createdAt: convertTimestamp(data.createdAt),
-    updatedAt: convertTimestamp(data.updatedAt),
-  };
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {

@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       app_url:
-        description: "Deployed Web App URL (e.g. https://messcost-bd.vercel.app)"
+        description: "Deployed Web App URL (e.g. https://mess-meal-cost.vercel.app)"
         required: false
-        default: "https://messcost-bd.vercel.app"
+        default: "https://mess-meal-cost.vercel.app"
 
 permissions:
   contents: write
@@ -40,7 +40,7 @@ jobs:
 
       - name: Create Lightweight Native Android WebView Wrapper Project
         env:
-          APP_URL: ${{ github.event.inputs.app_url || vars.NEXT_PUBLIC_APP_URL || 'https://messcost-bd.vercel.app' }}
+          APP_URL: ${{ github.event.inputs.app_url || vars.NEXT_PUBLIC_APP_URL || 'https://mess-meal-cost.vercel.app' }}
         run: |
           mkdir -p android-app/app/src/main/java/com/messcost/bd
           mkdir -p android-app/app/src/main/res/values
@@ -159,6 +159,11 @@ jobs:
                   settings.setDomStorageEnabled(true);
                   settings.setDatabaseEnabled(true);
                   settings.setAllowFileAccess(true);
+                  settings.setJavaScriptCanOpenWindowsAutomatically(true);
+                  String ua = settings.getUserAgentString();
+                  if (ua != null) {
+                      settings.setUserAgentString(ua.replace("; wv", ""));
+                  }
 
                   webView.setWebViewClient(new WebViewClient());
                   webView.setWebChromeClient(new WebChromeClient());

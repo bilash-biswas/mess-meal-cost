@@ -44,7 +44,7 @@ export function AppQrModal({
   const [activeTab, setActiveTab] = useState<"invite" | "github_apk" | "pwa">(
     initialTab
   );
-  const [origin, setOrigin] = useState("https://messcost-bd.vercel.app");
+  const [origin, setOrigin] = useState("https://mess-meal-cost.vercel.app");
   const [githubRepo, setGithubRepo] = useState(
     process.env.NEXT_PUBLIC_GITHUB_REPO || "bilash-biswas/mess-meal-cost"
   );

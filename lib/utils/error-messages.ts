@@ -43,6 +43,21 @@ export function getFriendlyErrorMessage(
       return "Please enter a valid email address.";
     case "auth/popup-closed-by-user":
       return "Google sign-in was cancelled before completion.";
+    case "auth/cancelled-popup-request":
+      return "Another sign-in popup is already open. Please complete or close it and try again.";
+    case "auth/popup-blocked":
+      return "Sign-in popup was blocked by your browser. Please allow popups for this site and try again.";
+    case "auth/unauthorized-domain": {
+      const host =
+        typeof window !== "undefined" && window.location?.hostname
+          ? window.location.hostname
+          : "mess-meal-cost.vercel.app";
+      return `Domain "${host}" is not authorized in Firebase yet. Go to Firebase Console → Authentication → Settings → Authorized domains and add "${host}".`;
+    }
+    case "auth/operation-not-allowed":
+      return "This sign-in method is not enabled yet. Enable Google & Email/Password in Firebase Console → Authentication → Sign-in method.";
+    case "auth/configuration-not-found":
+      return "Firebase Authentication is not initialized in your Firebase Console yet. Open Firebase Console → Authentication → Get Started.";
     case "auth/too-many-requests":
       return "Too many attempts. Please wait a moment before trying again.";
     case "auth/network-request-failed":
