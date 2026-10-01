@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useMemo } from "react";
-import { BarChart3, Printer, ShoppingBag, PieChart } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { BarChart3, Printer, ShoppingBag, PieChart, MessageCircle } from "lucide-react";
 import { useMess } from "@/hooks/use-mess";
 import { useExpenses } from "@/hooks/use-expenses";
 import { formatBDT, formatMonthTitle } from "@/lib/utils";
 import { EXPENSE_CATEGORIES } from "@/types/expense";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ShareSummaryModal } from "@/components/reports/share-summary-modal";
 import {
   Card,
   CardContent,
@@ -17,8 +18,9 @@ import {
 } from "@/components/ui/card";
 
 export default function ReportsPage() {
-  const { mess, selectedMonthId, accounting } = useMess();
+  const { mess, selectedMonthId, accounting, settlements } = useMess();
   const { expenses, buyerTotals } = useExpenses();
+  const [shareOpen, setShareOpen] = useState(false);
 
   const groupedBreakdown = useMemo(() => {
     const groups = {
@@ -70,14 +72,24 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => window.print()}
-          className="print:hidden"
-        >
-          <Printer className="h-4 w-4" /> Print Report
-        </Button>
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
+          <Button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
+          >
+            <MessageCircle className="h-4 w-4" /> Share on WhatsApp (হিসাব শেয়ার)
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => window.print()}
+            className="cursor-pointer"
+          >
+            <Printer className="h-4 w-4" /> Print Report
+          </Button>
+        </div>
       </div>
 
       {/* 1. Expense Summary */}
@@ -249,6 +261,15 @@ export default function ReportsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ShareSummaryModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        messName={mess?.name || "Our Mess"}
+        monthId={selectedMonthId}
+        accounting={accounting}
+        settlements={settlements}
+      />
     </div>
   );
 }

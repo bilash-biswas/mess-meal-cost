@@ -1,16 +1,19 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   ArrowRightLeft,
   ArrowRight,
   CheckCircle2,
   AlertCircle,
   Wallet,
+  MessageCircle,
 } from "lucide-react";
 import { useMess } from "@/hooks/use-mess";
 import { formatBDT, formatMonthTitle } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ShareSummaryModal } from "@/components/reports/share-summary-modal";
 import {
   Card,
   CardContent,
@@ -20,7 +23,8 @@ import {
 } from "@/components/ui/card";
 
 export default function SettlementPage() {
-  const { selectedMonthId, accounting, settlements } = useMess();
+  const { mess, selectedMonthId, accounting, settlements } = useMess();
+  const [shareOpen, setShareOpen] = useState(false);
 
   const membersWhoOwe = accounting.memberBalances.filter(
     (m) => m.status === "due"
@@ -31,15 +35,25 @@ export default function SettlementPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <ArrowRightLeft className="h-6 w-6 text-emerald-600" /> Monthly
-          Settlement (বকেয়া ও পাওনা সমন্বয়)
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Suggested minimum transfers for {formatMonthTitle(selectedMonthId)} to
-          settle all dues and receivables cleanly.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <ArrowRightLeft className="h-6 w-6 text-emerald-600" /> Monthly
+            Settlement (বকেয়া ও পাওনা সমন্বয়)
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Suggested minimum transfers for {formatMonthTitle(selectedMonthId)} to
+            settle all dues and receivables cleanly.
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
+        >
+          <MessageCircle className="h-4 w-4" /> Share on WhatsApp (হিসাব শেয়ার)
+        </Button>
       </div>
 
       {/* Debtors & Creditors Overview */}
@@ -174,6 +188,15 @@ export default function SettlementPage() {
           )}
         </CardContent>
       </Card>
+
+      <ShareSummaryModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        messName={mess?.name || "Our Mess"}
+        monthId={selectedMonthId}
+        accounting={accounting}
+        settlements={settlements}
+      />
     </div>
   );
 }
