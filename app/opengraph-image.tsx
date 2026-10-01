@@ -39,13 +39,13 @@ export default function OpenGraphImage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "40px",
+              fontSize: "32px",
               fontWeight: "900",
               color: "#ffffff",
               boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
             }}
           >
-            ৳
+            Tk
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span
@@ -80,7 +80,7 @@ export default function OpenGraphImage() {
         >
           <div
             style={{
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
               gap: "8px",
               backgroundColor: "rgba(16, 185, 129, 0.25)",
@@ -90,10 +90,9 @@ export default function OpenGraphImage() {
               fontSize: "18px",
               fontWeight: "600",
               color: "#6ee7b7",
-              width: "max-content",
             }}
           >
-            ★ 100% Free Forever • Built for Bangladesh Bachelor Messes
+            100% Free Forever • Built for Bachelor Messes in Bangladesh
           </div>
 
           <h1
@@ -105,7 +104,7 @@ export default function OpenGraphImage() {
               margin: 0,
             }}
           >
-            Simple Mess হিসাব, Shared by Everyone.
+            Simple Mess Hisab, Shared by Everyone.
           </h1>
 
           <p
@@ -117,7 +116,7 @@ export default function OpenGraphImage() {
               lineHeight: "1.4",
             }}
           >
-            মেসের হিসাব, সহজেই সবার জন্য। Daily Meal Sheet • Bazar Expenses • Live Meal Rate (৳) • Instant Settlement
+            Smart Daily Meal Sheet • Bazar Expenses • Live Meal Rate • Instant Settlement
           </p>
         </div>
 
@@ -141,7 +140,7 @@ export default function OpenGraphImage() {
               fontWeight: "600",
             }}
           >
-            ✓ Day-Wise Meal Khata
+            • Day-Wise Meal Khata
           </div>
           <div
             style={{
@@ -152,7 +151,7 @@ export default function OpenGraphImage() {
               fontWeight: "600",
             }}
           >
-            ✓ Auto Payer Bazar Credit
+            • Auto Payer Bazar Credit
           </div>
           <div
             style={{
@@ -163,7 +162,7 @@ export default function OpenGraphImage() {
               fontWeight: "600",
             }}
           >
-            ✓ Android APK & PWA
+            • Android APK & PWA
           </div>
           <div
             style={{
@@ -174,7 +173,7 @@ export default function OpenGraphImage() {
               fontWeight: "600",
             }}
           >
-            ✓ QR Code Sharing
+            • WhatsApp & QR Share
           </div>
         </div>
       </div>
