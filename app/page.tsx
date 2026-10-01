@@ -252,6 +252,56 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* SEO FAQ Section */}
+        <section className="py-14 sm:py-20 border-t border-slate-200/70 dark:border-slate-800/70 bg-slate-50/50 dark:bg-slate-950">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-8">
+            <div className="text-center space-y-2">
+              <Badge variant="info">FAQ • সাধারণ জিজ্ঞাসা</Badge>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                Frequently Asked Questions (মেসের হিসাব সংক্রান্ত প্রশ্নাবলী)
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Answers to common questions about bachelor mess accounts, meal rates, and expense management.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                {
+                  q: "মিল রেট (Meal Rate) কীভাবে হিসাব হয়?",
+                  qEn: "How is the mess meal rate calculated?",
+                  a: "মেসকস্টে মিল রেট সম্পূর্ণ নিখুঁতভাবে হিসাব করা হয়: মোট বাজার ও খাবারের খরচ ÷ সব মেম্বারদের মোট মিল = লাইভ মিল রেট। এরপর মেম্বার মিল খরচ = মেম্বারের নিজস্ব মোট মিল × মিল রেট। পয়সার কোনো গরমিল ছাড়া শতভাগ সঠিক দুই-দশমিক BDT (৳) হিসাব পাওয়া যায়।",
+                },
+                {
+                  q: "বাজার খরচ কে দেয় এবং কীভাবে তা জমা (Paid) হিসেবে যোগ হয়?",
+                  qEn: "Who adds bazar expenses and how is the payer credited?",
+                  a: "যেকোনো মেম্বার বাজার করলে সরাসরি অ্যাপে খরচ যোগ করতে পারেন। যিনি খরচটি এন্ট্রি করবেন, স্বয়ংক্রিয়ভাবে তার নামে পণ্য ক্রয়ের টাকা জমা হিসেবে যুক্ত হবে। ফলে মাস শেষে তার বকেয়া (Due) কমে আসবে অথবা তিনি পাওনাদার (Refundable) হবেন।",
+                },
+                {
+                  q: "মেসকস্ট কি মোবাইল অ্যাপ হিসেবে ব্যবহার করা যায়?",
+                  qEn: "Can I use MessCost as a mobile app on Android or iPhone?",
+                  a: "হ্যাঁ! মেসকস্ট একটি আধুনিক PWA (Progressive Web App) যা যেকোনো মোবাইল ব্রাউজার থেকে সরাসরি হোম স্ক্রিনে ইনস্টল করা যায়। এছাড়াও GitHub Releases থেকে লাইটওয়েট অ্যান্ড্রয়েড .APK ডাউনলোড করে ইনস্টল করার সুবিধাও রয়েছে।",
+                },
+                {
+                  q: "কাগজের খাতার চেয়ে মেসকস্টে মেসের হিসাব রাখা কেন ভালো?",
+                  qEn: "Why is MessCost better than a traditional paper khata?",
+                  a: "কাগজের খাতায় হিসাবের কাটাকাটি, ভুল মিল রেট এবং মাসের শেষে হিসাব মেলাতে গিয়ে অযথা ঝামেলা হয়। মেসকস্টে প্রতিটি মেম্বার নিজস্ব ফোন থেকে প্রতিদিনের মিল ও খরচের হিসাব রিয়েল-টাইমে দেখতে পান, ফলে সম্পূর্ণ স্বচ্ছতা ও মেসের সম্প্রীতি বজায় থাকে।",
+                },
+              ].map((faq, idx) => (
+                <Card key={idx} className="p-5 space-y-2">
+                  <h3 className="font-semibold text-base text-slate-900 dark:text-white flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                    <span>{faq.q}</span>
+                    <span className="text-xs text-slate-400 font-normal">({faq.qEn})</span>
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {faq.a}
+                  </p>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer className="border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-500">
