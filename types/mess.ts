@@ -1,6 +1,6 @@
 export type MessRole = "owner" | "admin" | "member";
 
-export type SharedSplitMode = "equal" | "custom" | "subset";
+export type SharedSplitMode = "equal" | "custom";
 
 export interface MealConfig {
   breakfast: number;

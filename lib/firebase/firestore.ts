@@ -1455,8 +1455,6 @@ export async function addMessExpense(params: {
   expenseType: ExpenseType;
   splitMode?: SharedSplitMode;
   customShares?: Record<string, number>;
-  sharedMemberIds?: string[];
-  isRecurring?: boolean;
   description: string;
   receiptUrl?: string | null;
   createdBy: string;
@@ -1481,8 +1479,6 @@ export async function addMessExpense(params: {
     expenseType: params.expenseType,
     splitMode: params.splitMode || "equal",
     customShares: params.customShares || undefined,
-    sharedMemberIds: params.sharedMemberIds || undefined,
-    isRecurring: Boolean(params.isRecurring),
     description: params.description.trim(),
     receiptUrl: params.receiptUrl || null,
     createdBy: params.createdBy,
@@ -1527,8 +1523,6 @@ export async function updateMessExpense(params: {
   expenseType: ExpenseType;
   splitMode?: SharedSplitMode;
   customShares?: Record<string, number>;
-  sharedMemberIds?: string[];
-  isRecurring?: boolean;
   description: string;
   receiptUrl?: string | null;
   isMonthClosed?: boolean;
@@ -1555,8 +1549,6 @@ export async function updateMessExpense(params: {
       expenseType: params.expenseType,
       splitMode: params.splitMode || "equal",
       customShares: params.customShares,
-      sharedMemberIds: params.sharedMemberIds,
-      isRecurring: Boolean(params.isRecurring),
       description: params.description.trim(),
       receiptUrl:
         params.receiptUrl !== undefined ? params.receiptUrl : existing.receiptUrl,
@@ -1580,8 +1572,6 @@ export async function updateMessExpense(params: {
     expenseType: params.expenseType,
     splitMode: params.splitMode || "equal",
     customShares: params.customShares || null,
-    sharedMemberIds: params.sharedMemberIds || null,
-    isRecurring: Boolean(params.isRecurring),
     description: params.description.trim(),
     ...(params.receiptUrl !== undefined ? { receiptUrl: params.receiptUrl } : {}),
     updatedAt: serverTimestamp(),

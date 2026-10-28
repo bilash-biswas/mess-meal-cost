@@ -84,14 +84,6 @@ export interface MessExpense {
    */
   splitMode?: SharedSplitMode;
   customShares?: Record<string, number>;
-  /**
-   * For subset split mode, specifies which specific member IDs share this expense equally.
-   */
-  sharedMemberIds?: string[];
-  /**
-   * Identifies recurring monthly bills such as Rent, Maid, Wi-Fi, or Waste bills.
-   */
-  isRecurring?: boolean;
   description: string;
   receiptUrl?: string | null;
   createdBy: string;

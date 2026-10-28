@@ -135,10 +135,8 @@ export const expenseSchema = z.object({
   expenseType: z.enum(["meal", "other"], {
     errorMap: () => ({ message: "Expense type must be Meal Expense or Other Shared Expense." }),
   }),
-  splitMode: z.enum(["equal", "custom", "subset"]).optional().default("equal"),
+  splitMode: z.enum(["equal", "custom"]).optional().default("equal"),
   customShares: z.record(z.string(), z.number().min(0)).optional(),
-  sharedMemberIds: z.array(z.string()).optional(),
-  isRecurring: z.boolean().optional(),
   description: z
     .string()
     .trim()
