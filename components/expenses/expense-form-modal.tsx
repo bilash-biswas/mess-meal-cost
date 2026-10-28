@@ -14,6 +14,7 @@ import {
   type ExpenseType,
   type MessExpense,
 } from "@/types/expense";
+import type { SharedSplitMode } from "@/types/mess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +44,10 @@ export function ExpenseFormModal({
   const [category, setCategory] = useState<ExpenseCategory>("vegetables");
   const [paidBy, setPaidBy] = useState("");
   const [expenseType, setExpenseType] = useState<ExpenseType>("meal");
+  const [splitMode, setSplitMode] = useState<SharedSplitMode>("equal");
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [customShares, setCustomShares] = useState<Record<string, string>>({});
+  const [isRecurring, setIsRecurring] = useState(false);
   const [description, setDescription] = useState("");
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -66,6 +71,23 @@ export function ExpenseFormModal({
       setCategory(editingExpense.category);
       setPaidBy(editingExpense.paidBy);
       setExpenseType(editingExpense.expenseType);
+      setSplitMode(editingExpense.splitMode || "equal");
+      setSelectedMemberIds(
+        editingExpense.sharedMemberIds && editingExpense.sharedMemberIds.length > 0
+          ? editingExpense.sharedMemberIds
+          : members.map((m) => m.uid)
+      );
+      setCustomShares(
+        editingExpense.customShares
+          ? Object.fromEntries(
+              Object.entries(editingExpense.customShares).map(([k, v]) => [
+                k,
+                String(v),
+              ])
+            )
+          : {}
+      );
+      setIsRecurring(Boolean(editingExpense.isRecurring));
       setDescription(editingExpense.description);
     } else {
       setDate(defaultDate);
@@ -74,6 +96,10 @@ export function ExpenseFormModal({
       // Whoever adds the expense automatically pays for this product
       setPaidBy(user?.uid || currentMember?.uid || members[0]?.uid || "");
       setExpenseType("meal");
+      setSplitMode("equal");
+      setSelectedMemberIds(members.map((m) => m.uid));
+      setCustomShares({});
+      setIsRecurring(false);
       setDescription("");
     }
   }, [open, editingExpense, defaultDate, user?.uid, currentMember?.uid, members]);
@@ -123,6 +149,30 @@ export function ExpenseFormModal({
       EXPENSE_CATEGORIES.find((c) => c.value === category)?.label ||
       "Bazar Expense";
 
+    let parsedCustomShares: Record<string, number> | undefined = undefined;
+    if (expenseType === "other") {
+      if (splitMode === "subset") {
+        if (selectedMemberIds.length === 0) {
+          setErrorMsg("Please select at least one member to share this expense.");
+          return;
+        }
+      } else if (splitMode === "custom") {
+        parsedCustomShares = {};
+        let sum = 0;
+        for (const m of members) {
+          const val = Number(customShares[m.uid]) || 0;
+          parsedCustomShares[m.uid] = val;
+          sum += val;
+        }
+        if (Math.abs(sum - numAmount) > 0.05) {
+          setErrorMsg(
+            `Total member shares (৳${sum.toFixed(2)}) must equal the expense amount (৳${numAmount.toFixed(2)}).`
+          );
+          return;
+        }
+      }
+    }
+
     setSubmitting(true);
     try {
       if (editingExpense) {
@@ -132,6 +182,16 @@ export function ExpenseFormModal({
           amount: numAmount,
           paidBy: resolvedPayerId,
           expenseType,
+          splitMode: expenseType === "other" ? splitMode : "equal",
+          customShares:
+            expenseType === "other" && splitMode === "custom"
+              ? parsedCustomShares
+              : undefined,
+          sharedMemberIds:
+            expenseType === "other" && splitMode === "subset"
+              ? selectedMemberIds
+              : undefined,
+          isRecurring: Boolean(isRecurring),
           description: resolvedDesc,
           receiptFile,
           existingReceiptUrl: editingExpense.receiptUrl,
@@ -143,6 +203,16 @@ export function ExpenseFormModal({
           amount: numAmount,
           paidBy: resolvedPayerId,
           expenseType,
+          splitMode: expenseType === "other" ? splitMode : "equal",
+          customShares:
+            expenseType === "other" && splitMode === "custom"
+              ? parsedCustomShares
+              : undefined,
+          sharedMemberIds:
+            expenseType === "other" && splitMode === "subset"
+              ? selectedMemberIds
+              : undefined,
+          isRecurring: Boolean(isRecurring),
           description: resolvedDesc,
           receiptFile,
         });
@@ -308,6 +378,172 @@ export function ExpenseFormModal({
             </button>
           </div>
         </div>
+
+        {/* Extended Split Settings for Shared Expense */}
+        {expenseType === "other" && (
+          <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-bold text-blue-900 dark:text-blue-300">
+                বিল বণ্টন পদ্ধতি (Shared Bill Split Mode)
+              </Label>
+              <span className="text-[11px] text-slate-500">
+                {splitMode === "equal"
+                  ? "সব মেম্বারদের মাঝে সমান ভাগ"
+                  : splitMode === "subset"
+                  ? `নির্দিষ্ট ${selectedMemberIds.length} জনের মাঝে ভাগ`
+                  : "কাস্টম পরিমাণ ভাগ"}
+              </span>
+            </div>
+
+            {/* Split Mode Options */}
+            <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900 p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setSplitMode("equal")}
+                className={`py-1.5 px-2 rounded-lg font-semibold transition-colors cursor-pointer text-center ${
+                  splitMode === "equal"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                All Members
+              </button>
+              <button
+                type="button"
+                onClick={() => setSplitMode("subset")}
+                className={`py-1.5 px-2 rounded-lg font-semibold transition-colors cursor-pointer text-center ${
+                  splitMode === "subset"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                Selected Only
+              </button>
+              <button
+                type="button"
+                onClick={() => setSplitMode("custom")}
+                className={`py-1.5 px-2 rounded-lg font-semibold transition-colors cursor-pointer text-center ${
+                  splitMode === "custom"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                Custom Shares
+              </button>
+            </div>
+
+            {/* Subset Member Checkboxes */}
+            {splitMode === "subset" && (
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    মেম্বার সিলেক্ট করুন ({selectedMemberIds.length}/{members.length}):
+                  </span>
+                  {Number(amount) > 0 && selectedMemberIds.length > 0 && (
+                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                      ৳{(Number(amount) / selectedMemberIds.length).toFixed(2)} প্রতি মেম্বার
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+                  {members.map((m) => {
+                    const isSelected = selectedMemberIds.includes(m.uid);
+                    return (
+                      <label
+                        key={m.uid}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-500/10 text-blue-900 dark:text-blue-100 font-semibold"
+                            : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedMemberIds((prev) => [...prev, m.uid]);
+                            } else {
+                              setSelectedMemberIds((prev) =>
+                                prev.filter((id) => id !== m.uid)
+                              );
+                            }
+                          }}
+                          className="h-3.5 w-3.5 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="truncate">{m.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Custom Amount Inputs */}
+            {splitMode === "custom" && (
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    প্রতিটি মেম্বারের নির্দিষ্ট শেয়ার:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const perMem = (Number(amount) / (members.length || 1)).toFixed(2);
+                      const next: Record<string, string> = {};
+                      members.forEach((m) => (next[m.uid] = perMem));
+                      setCustomShares(next);
+                    }}
+                    className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    সমানভাবে বসান (Auto Fill)
+                  </button>
+                </div>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {members.map((m) => (
+                    <div
+                      key={m.uid}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
+                      <span className="truncate w-36 text-slate-700 dark:text-slate-300">
+                        {m.name}
+                      </span>
+                      <div className="relative flex-1">
+                        <span className="absolute left-2.5 top-2 text-slate-400">৳</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={customShares[m.uid] ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomShares((prev) => ({ ...prev, [m.uid]: val }));
+                          }}
+                          className="h-8 w-full rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-6 pr-2 text-xs font-semibold text-right"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recurring Bill Checkbox */}
+            <div className="pt-1 border-t border-blue-500/10">
+              <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isRecurring}
+                  onChange={(e) => setIsRecurring(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <span>
+                  <strong>মাসিক নির্ধারিত বিল (Recurring Bill)</strong> — যেমন বাসা ভাড়া, ওয়াই-ফাই, ময়লা বিল
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">

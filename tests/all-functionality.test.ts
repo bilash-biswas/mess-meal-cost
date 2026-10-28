@@ -243,4 +243,139 @@ describe("All Functionality Verification Suite", () => {
       expect(text).toContain("https://mess-meal-cost.vercel.app");
     });
   });
+
+  describe("6. Extended Shared Expenses (Subset Split & Custom Shares)", () => {
+    const members = [
+      { uid: "u_bilash", name: "Bilash", isActive: true },
+      { uid: "u_tanvir", name: "Tanvir", isActive: true },
+      { uid: "u_sakib", name: "Sakib", isActive: true },
+    ];
+
+    it("splits expense across a subset of members correctly", () => {
+      // Wi-Fi bill ৳1000 shared ONLY by Bilash and Tanvir (Sakib doesn't use Wi-Fi)
+      const accounting = calculateMonthlyAccounting({
+        members,
+        meals: [
+          { userId: "u_bilash", breakfast: 10, lunch: 0, dinner: 0 },
+          { userId: "u_tanvir", breakfast: 10, lunch: 0, dinner: 0 },
+          { userId: "u_sakib", breakfast: 10, lunch: 0, dinner: 0 },
+        ],
+        expenses: [
+          {
+            amount: 1000,
+            expenseType: "other",
+            paidBy: "u_bilash",
+            splitMode: "subset",
+            sharedMemberIds: ["u_bilash", "u_tanvir"],
+            isRecurring: true,
+          },
+        ],
+        payments: [],
+      });
+
+      const bilash = accounting.memberBalances.find((m) => m.userId === "u_bilash")!;
+      const tanvir = accounting.memberBalances.find((m) => m.userId === "u_tanvir")!;
+      const sakib = accounting.memberBalances.find((m) => m.userId === "u_sakib")!;
+
+      // Bilash & Tanvir share ৳1000 / 2 = ৳500 each in custom/subset shares
+      expect(bilash.customExpenseShare).toBe(500);
+      expect(tanvir.customExpenseShare).toBe(500);
+      // Sakib is not in sharedMemberIds, so 0 shared expense
+      expect(sakib.customExpenseShare).toBe(0);
+      expect(sakib.sharedExpenseShare).toBe(0);
+      expect(sakib.sharedExpenseShare).toBe(0);
+
+      // Bilash paid 1000, cost is 500 -> Receivable 500
+      expect(bilash.balance).toBe(-500);
+      expect(bilash.status).toBe("receivable");
+
+      // Tanvir paid 0, cost is 500 -> Due 500
+      expect(tanvir.balance).toBe(500);
+      expect(tanvir.status).toBe("due");
+
+      // Sakib paid 0, cost is 0 -> Settled 0
+      expect(sakib.balance).toBe(0);
+      expect(sakib.status).toBe("settled");
+    });
+
+    it("splits expense using custom exact shares correctly", () => {
+      // Maid/Khala bill ৳1500: Bilash pays 600, Tanvir pays 500, Sakib pays 400
+      const accounting = calculateMonthlyAccounting({
+        members,
+        meals: [
+          { userId: "u_bilash", breakfast: 10, lunch: 0, dinner: 0 },
+          { userId: "u_tanvir", breakfast: 10, lunch: 0, dinner: 0 },
+          { userId: "u_sakib", breakfast: 10, lunch: 0, dinner: 0 },
+        ],
+        expenses: [
+          {
+            amount: 1500,
+            expenseType: "other",
+            paidBy: "u_tanvir",
+            splitMode: "custom",
+            customShares: {
+              u_bilash: 600,
+              u_tanvir: 500,
+              u_sakib: 400,
+            },
+          },
+        ],
+        payments: [],
+      });
+
+      const bilash = accounting.memberBalances.find((m) => m.userId === "u_bilash")!;
+      const tanvir = accounting.memberBalances.find((m) => m.userId === "u_tanvir")!;
+      const sakib = accounting.memberBalances.find((m) => m.userId === "u_sakib")!;
+
+      expect(bilash.customExpenseShare).toBe(600);
+      expect(tanvir.customExpenseShare).toBe(500);
+      expect(sakib.customExpenseShare).toBe(400);
+
+      // Tanvir paid 1500, cost is 500 -> Receivable 1000
+      expect(tanvir.balance).toBe(-1000);
+      expect(tanvir.status).toBe("receivable");
+      expect(bilash.balance).toBe(600);
+      expect(sakib.balance).toBe(400);
+    });
+  });
+
+  describe("7. Extended Meals Suite (Guest Meals & Fractional Weights)", () => {
+    it("handles guest meals and fractional meals seamlessly in meal rate calculations", () => {
+      const members = [
+        { uid: "u_bilash", name: "Bilash", isActive: true },
+        { uid: "u_tanvir", name: "Tanvir", isActive: true },
+      ];
+
+      // Bilash: 20 normal meals + 2 guest meals (total = 22)
+      // Tanvir: 15.5 meals (15 normal + 1 half-meal/breakfast 0.5)
+      // Total Meals = 22 + 15.5 = 37.5
+      // Bazar expense = ৳3,750
+      // Expected Meal Rate = 3750 / 37.5 = ৳100.00
+      const accounting = calculateMonthlyAccounting({
+        members,
+        meals: [
+          { userId: "u_bilash", breakfast: 22, lunch: 0, dinner: 0 },
+          { userId: "u_tanvir", breakfast: 15.5, lunch: 0, dinner: 0 },
+        ],
+        expenses: [
+          { amount: 3750, expenseType: "meal", paidBy: "u_bilash" },
+        ],
+        payments: [],
+      });
+
+      expect(accounting.totalMeals).toBe(37.5);
+      expect(accounting.mealRate).toBe(100);
+
+      const bilash = accounting.memberBalances.find((m) => m.userId === "u_bilash")!;
+      const tanvir = accounting.memberBalances.find((m) => m.userId === "u_tanvir")!;
+
+      expect(bilash.meals).toBe(22);
+      expect(bilash.mealCost).toBe(2200);
+
+      expect(tanvir.meals).toBe(15.5);
+      expect(tanvir.mealCost).toBe(1550);
+
+      expect(roundCurrency(bilash.mealCost + tanvir.mealCost)).toBe(3750);
+    });
+  });
 });

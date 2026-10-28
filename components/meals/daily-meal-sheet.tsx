@@ -15,6 +15,7 @@ import {
   Grid3X3,
   CalendarDays,
   Users,
+  PlaneTakeoff,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useMess } from "@/hooks/use-mess";
@@ -38,6 +39,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { MealOffModal } from "@/components/meals/meal-off-modal";
 
 /**
  * Generates all YYYY-MM-DD dates for a given YYYY-MM month string.
@@ -94,6 +96,7 @@ export function DailyMealSheet() {
 
   const [viewMode, setViewMode] = useState<"khata" | "daily">("khata");
   const [selectedDate, setSelectedDate] = useState<string>(defaultDate);
+  const [mealOffOpen, setMealOffOpen] = useState(false);
 
   const {
     dateMealsMap,
@@ -102,15 +105,15 @@ export function DailyMealSheet() {
   } = useMeals(selectedDate);
 
   // --------------------------------------------------------------------------
-  // 1. Single-Day State (Present = 1, Absent = 0)
+  // 1. Single-Day State (0: Absent, 0.5: Half, 1: Present, 2: Guest+1, 3: Guest+2, etc.)
   // --------------------------------------------------------------------------
-  const [dailyDraft, setDailyDraft] = useState<Record<string, 0 | 1>>({});
+  const [dailyDraft, setDailyDraft] = useState<Record<string, number>>({});
   const [dailyDirty, setDailyDirty] = useState(false);
 
   // --------------------------------------------------------------------------
-  // 2. Full-Month Khata Grid State: key = `${date}_${uid}` -> 0 | 1
+  // 2. Full-Month Khata Grid State: key = `${date}_${uid}` -> meal count
   // --------------------------------------------------------------------------
-  const [khataDraft, setKhataDraft] = useState<Record<string, 0 | 1>>({});
+  const [khataDraft, setKhataDraft] = useState<Record<string, number>>({});
   const [dirtyDates, setDirtyDates] = useState<Set<string>>(new Set());
 
   const [saving, setSaving] = useState(false);
@@ -125,11 +128,11 @@ export function DailyMealSheet() {
 
   // Sync Single-Day draft when date or Firestore meals change
   useEffect(() => {
-    const next: Record<string, 0 | 1> = {};
+    const next: Record<string, number> = {};
     for (const member of members) {
       const existing = dateMealsMap[member.uid];
       const total = existing ? calculateDailyMealTotal(existing) : 0;
-      next[member.uid] = total >= 1 ? 1 : 0;
+      next[member.uid] = total;
     }
     setDailyDraft(next);
     setDailyDirty(false);
@@ -137,10 +140,10 @@ export function DailyMealSheet() {
 
   // Sync Full-Month Khata grid when Firestore month meals change
   useEffect(() => {
-    const nextGrid: Record<string, 0 | 1> = {};
+    const nextGrid: Record<string, number> = {};
     for (const entry of meals) {
       const total = calculateDailyMealTotal(entry);
-      nextGrid[`${entry.date}_${entry.userId}`] = total >= 1 ? 1 : 0;
+      nextGrid[`${entry.date}_${entry.userId}`] = total;
     }
     setKhataDraft(nextGrid);
     setDirtyDates(new Set());
@@ -155,19 +158,15 @@ export function DailyMealSheet() {
   // ==========================================================================
   // Single-Day View Handlers
   // ==========================================================================
-  const toggleSingleDayMember = (uid: string, value?: 0 | 1) => {
+  const setSingleDayMemberVal = (uid: string, value: number) => {
     if (!canEditMember(uid)) return;
     setSuccessMsg(null);
     setErrorMsg(null);
-    setDailyDraft((prev) => {
-      const current = prev[uid] ?? 0;
-      const nextVal: 0 | 1 = value !== undefined ? value : current === 1 ? 0 : 1;
-      return { ...prev, [uid]: nextVal };
-    });
+    setDailyDraft((prev) => ({ ...prev, [uid]: value }));
     setDailyDirty(true);
   };
 
-  const handleMarkAllSingleDay = (status: 0 | 1) => {
+  const handleMarkAllSingleDay = (status: number) => {
     if (isMonthClosed) return;
     setSuccessMsg(null);
     setDailyDraft((prev) => {
@@ -198,7 +197,7 @@ export function DailyMealSheet() {
         for (const member of members) {
           if (canEditMember(member.uid) && prevMap[member.uid]) {
             const prevTotal = calculateDailyMealTotal(prevMap[member.uid]);
-            next[member.uid] = prevTotal >= 1 ? 1 : 0;
+            next[member.uid] = prevTotal;
           }
         }
         return next;
@@ -226,7 +225,7 @@ export function DailyMealSheet() {
           return {
             userId: m.uid,
             memberName: m.name,
-            breakfast: val, // 1 for Present, 0 for Absent (total = 1 or 0)
+            breakfast: val,
             lunch: 0,
             dinner: 0,
           };
@@ -235,7 +234,7 @@ export function DailyMealSheet() {
       await saveMealsForDate(selectedDate, entries);
       setDailyDirty(false);
       setSuccessMsg(
-        `Saved day-wise attendance for ${formatReadableDate(selectedDate)}.`
+        `Saved attendance and meals for ${formatReadableDate(selectedDate)}.`
       );
     } catch (err) {
       setErrorMsg(getFriendlyErrorMessage(err));
@@ -247,14 +246,23 @@ export function DailyMealSheet() {
   // ==========================================================================
   // Full-Month Khata Grid Handlers
   // ==========================================================================
-  const toggleKhataCell = (date: string, uid: string) => {
+  const cycleKhataCell = (date: string, uid: string) => {
     if (!canEditMember(uid)) return;
     setSuccessMsg(null);
     setErrorMsg(null);
     const key = `${date}_${uid}`;
     setKhataDraft((prev) => {
       const current = prev[key] ?? 0;
-      return { ...prev, [key]: current === 1 ? 0 : 1 };
+      let nextVal = 0;
+      // Cycle: 0 -> 1 -> 2 (Guest +1) -> 3 (Guest +2) -> 0
+      // If half meal (0.5), cycle to 1
+      if (current === 0) nextVal = 1;
+      else if (current === 1) nextVal = 2;
+      else if (current === 2) nextVal = 3;
+      else if (current === 3) nextVal = 0;
+      else if (current === 0.5) nextVal = 1;
+      else nextVal = 0;
+      return { ...prev, [key]: nextVal };
     });
     setDirtyDates((prev) => {
       const next = new Set(prev);
@@ -263,7 +271,7 @@ export function DailyMealSheet() {
     });
   };
 
-  const setKhataRowAll = (date: string, status: 0 | 1) => {
+  const setKhataRowAll = (date: string, status: number) => {
     if (isMonthClosed) return;
     setSuccessMsg(null);
     setErrorMsg(null);
@@ -315,7 +323,7 @@ export function DailyMealSheet() {
       }
       setDirtyDates(new Set());
       setSuccessMsg(
-        `Saved day-wise attendance for ${datesToSave.length} day(s) in ${formatMonthTitle(
+        `Saved meal attendance for ${datesToSave.length} day(s) in ${formatMonthTitle(
           selectedMonthId
         )}.`
       );
@@ -324,6 +332,70 @@ export function DailyMealSheet() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // ==========================================================================
+  // Vacation / Range Meal Off Handler
+  // ==========================================================================
+  const handleApplyRange = async (
+    targetUserId: string,
+    dates: string[],
+    targetValue: number
+  ) => {
+    if (!mess || !user || isMonthClosed) return;
+
+    for (const date of dates) {
+      const entries: MemberDailyMealInput[] = members
+        .filter((m) => canEditMember(m.uid))
+        .map((m) => {
+          const val =
+            m.uid === targetUserId
+              ? targetValue
+              : khataDraft[`${date}_${m.uid}`] ?? 0;
+          return {
+            userId: m.uid,
+            memberName: m.name,
+            breakfast: val,
+            lunch: 0,
+            dinner: 0,
+          };
+        });
+
+      await saveDailyMealsBatch({
+        messId: mess.id,
+        monthId: date.slice(0, 7) || selectedMonthId,
+        date,
+        entries,
+        updatedBy: user.uid,
+        isMonthClosed,
+      });
+    }
+
+    setKhataDraft((prev) => {
+      const next = { ...prev };
+      for (const d of dates) {
+        next[`${d}_${targetUserId}`] = targetValue;
+      }
+      return next;
+    });
+
+    if (dates.includes(selectedDate)) {
+      setDailyDraft((prev) => ({
+        ...prev,
+        [targetUserId]: targetValue,
+      }));
+    }
+
+    setDirtyDates((prev) => {
+      const next = new Set(prev);
+      for (const d of dates) next.delete(d);
+      return next;
+    });
+
+    const targetMember = members.find((m) => m.uid === targetUserId);
+    setSuccessMsg(
+      `Successfully set ${targetValue} meal(s) for ${targetMember?.name || "Member"} across ${dates.length} days.`
+    );
   };
 
   // Compute live Khata totals per member and overall
@@ -351,10 +423,10 @@ export function DailyMealSheet() {
 
   return (
     <div className="space-y-6">
-      {/* View Switcher & System Info Bar */}
+      {/* View Switcher, Vacation Range Action, & Stats Bar */}
       <Card>
-        <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <CardContent className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex rounded-xl border border-slate-200 dark:border-slate-800 p-1 bg-slate-100/80 dark:bg-slate-900">
               <button
                 type="button"
@@ -381,14 +453,35 @@ export function DailyMealSheet() {
                 Single-Day Quick View
               </button>
             </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setMealOffOpen(true)}
+              disabled={isMonthClosed}
+              className="border-emerald-600/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-medium text-xs sm:text-sm"
+            >
+              <PlaneTakeoff className="h-4 w-4 text-emerald-600" />
+              Vacation / Range Off (ছুটিতে মিল বন্ধ)
+            </Button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <Badge variant="positive" className="px-3 py-1 text-xs">
-              Present = 1 • Absent = 0
-            </Badge>
-            <Badge variant="info" className="px-3 py-1 text-xs">
-              Month Total: {khataGrandTotal} Days
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700" /> 0 Off
+              <span className="mx-1 text-slate-300">•</span>
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-sky-400" /> ½ Half
+              <span className="mx-1 text-slate-300">•</span>
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" /> 1 Normal
+              <span className="mx-1 text-slate-300">•</span>
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-purple-500" /> 2 (G+1)
+              <span className="mx-1 text-slate-300">•</span>
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" /> 3 (G+2)
+            </div>
+
+            <Badge variant="info" className="px-3 py-1.5 text-xs font-bold">
+              Month Total: {khataGrandTotal} Meals
             </Badge>
           </div>
         </CardContent>
@@ -436,9 +529,7 @@ export function DailyMealSheet() {
                 Day-Wise Mess Khata — {formatMonthTitle(selectedMonthId)}
               </CardTitle>
               <CardDescription>
-                Tap any cell to toggle <strong>1 (Present)</strong> or{" "}
-                <strong>0 (Absent)</strong>, then click{" "}
-                <strong>Save Changes</strong>.
+                Tap any cell to cycle <strong>0 (Off)</strong> ➜ <strong>1 (Normal)</strong> ➜ <strong>2 (Guest +1)</strong> ➜ <strong>3 (Guest +2)</strong>, then click <strong>Save Changes</strong>.
               </CardDescription>
             </div>
 
@@ -527,6 +618,26 @@ export function DailyMealSheet() {
                           rowTotal += val;
                           const editable = canEditMember(m.uid);
 
+                          // Style based on meal value
+                          let cellClass =
+                            "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700";
+                          if (val === 1) {
+                            cellClass =
+                              "bg-emerald-600 text-white shadow-2xs hover:bg-emerald-700";
+                          } else if (val === 0.5) {
+                            cellClass =
+                              "bg-sky-500/15 border border-sky-400/40 text-sky-700 dark:text-sky-300 hover:bg-sky-500/25";
+                          } else if (val === 2) {
+                            cellClass =
+                              "bg-purple-600 text-white shadow-2xs hover:bg-purple-700";
+                          } else if (val === 3) {
+                            cellClass =
+                              "bg-amber-600 text-white shadow-2xs hover:bg-amber-700";
+                          } else if (val > 3) {
+                            cellClass =
+                              "bg-indigo-600 text-white shadow-2xs hover:bg-indigo-700";
+                          }
+
                           return (
                             <td
                               key={m.uid}
@@ -535,23 +646,28 @@ export function DailyMealSheet() {
                               <button
                                 type="button"
                                 disabled={!editable}
-                                onClick={() => toggleKhataCell(d.date, m.uid)}
-                                aria-label={`${m.name} on ${d.shortLabel}: ${
-                                  val === 1 ? "Present (1)" : "Absent (0)"
-                                }`}
-                                className={`inline-flex h-8 w-14 items-center justify-center gap-1 rounded-lg font-bold text-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                                  val === 1
-                                    ? "bg-emerald-600 text-white shadow-2xs hover:bg-emerald-700"
-                                    : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
-                                }`}
+                                onClick={() => cycleKhataCell(d.date, m.uid)}
+                                aria-label={`${m.name} on ${d.shortLabel}: ${val} meal(s)`}
+                                className={`inline-flex h-8 w-14 items-center justify-center gap-1 rounded-lg font-bold text-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${cellClass}`}
                               >
-                                {val === 1 ? (
+                                {val === 1 && (
                                   <>
                                     <Check className="h-3.5 w-3.5" /> 1
                                   </>
-                                ) : (
-                                  <span>0</span>
                                 )}
+                                {val === 0.5 && <span>½</span>}
+                                {val === 0 && <span>0</span>}
+                                {val === 2 && (
+                                  <span className="flex items-center gap-0.5 text-[11px]">
+                                    2 <span className="text-[9px] opacity-90 font-normal">G+1</span>
+                                  </span>
+                                )}
+                                {val === 3 && (
+                                  <span className="flex items-center gap-0.5 text-[11px]">
+                                    3 <span className="text-[9px] opacity-90 font-normal">G+2</span>
+                                  </span>
+                                )}
+                                {val > 3 && <span>{val}</span>}
                               </button>
                             </td>
                           );
@@ -632,7 +748,7 @@ export function DailyMealSheet() {
       )}
 
       {/* =====================================================================
-          VIEW 2: SINGLE-DAY QUICK ATTENDANCE VIEW (Present = 1, Absent = 0)
+          VIEW 2: SINGLE-DAY QUICK ATTENDANCE & GUEST MEAL VIEW
          ===================================================================== */}
       {viewMode === "daily" && (
         <Card>
@@ -663,7 +779,7 @@ export function DailyMealSheet() {
                   {formatReadableDate(selectedDate)}
                 </CardTitle>
                 <CardDescription>
-                  Present Today: <strong>{singleDayTotal}</strong> of{" "}
+                  Day Meals: <strong>{singleDayTotal}</strong> across{" "}
                   {members.length} members
                 </CardDescription>
               </div>
@@ -724,7 +840,7 @@ export function DailyMealSheet() {
                 return (
                   <div
                     key={member.uid}
-                    className="py-3.5 flex items-center justify-between gap-4"
+                    className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                   >
                     <div>
                       <p className="font-semibold text-slate-900 dark:text-white">
@@ -732,37 +848,90 @@ export function DailyMealSheet() {
                       </p>
                       <p className="text-xs text-slate-500">
                         Monthly Total:{" "}
-                        <strong>{khataMemberTotals[member.uid] ?? 0}</strong>{" "}
-                        days present
+                        <strong className="text-emerald-600 dark:text-emerald-400">
+                          {khataMemberTotals[member.uid] ?? 0}
+                        </strong>{" "}
+                        meals this month
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      {/* Absent 0 */}
                       <button
                         type="button"
                         disabled={!editable}
-                        onClick={() => toggleSingleDayMember(member.uid, 1)}
-                        className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition-all cursor-pointer disabled:opacity-50 ${
-                          status === 1
-                            ? "bg-emerald-600 text-white shadow-xs"
-                            : "border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                        }`}
-                      >
-                        <Check className="h-4 w-4" /> Present (1)
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={!editable}
-                        onClick={() => toggleSingleDayMember(member.uid, 0)}
-                        className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition-all cursor-pointer disabled:opacity-50 ${
+                        onClick={() => setSingleDayMemberVal(member.uid, 0)}
+                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 ${
                           status === 0
                             ? "bg-rose-600 text-white shadow-xs"
                             : "border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                         }`}
                       >
-                        <X className="h-4 w-4" /> Absent (0)
+                        <X className="h-3.5 w-3.5" /> 0 Off
                       </button>
+
+                      {/* Half 0.5 */}
+                      <button
+                        type="button"
+                        disabled={!editable}
+                        onClick={() => setSingleDayMemberVal(member.uid, 0.5)}
+                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 ${
+                          status === 0.5
+                            ? "bg-sky-600 text-white shadow-xs"
+                            : "border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        ½ Half
+                      </button>
+
+                      {/* Present 1 */}
+                      <button
+                        type="button"
+                        disabled={!editable}
+                        onClick={() => setSingleDayMemberVal(member.uid, 1)}
+                        className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 ${
+                          status === 1
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : "border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        <Check className="h-3.5 w-3.5" /> 1 Normal
+                      </button>
+
+                      {/* Guest +1 (2) */}
+                      <button
+                        type="button"
+                        disabled={!editable}
+                        onClick={() => setSingleDayMemberVal(member.uid, 2)}
+                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 ${
+                          status === 2
+                            ? "bg-purple-600 text-white shadow-xs"
+                            : "border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        2 (Guest +1)
+                      </button>
+
+                      {/* Guest +2 (3) */}
+                      <button
+                        type="button"
+                        disabled={!editable}
+                        onClick={() => setSingleDayMemberVal(member.uid, 3)}
+                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 ${
+                          status === 3
+                            ? "bg-amber-600 text-white shadow-xs"
+                            : "border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        3 (Guest +2)
+                      </button>
+
+                      {/* Fallback if value is greater than 3 */}
+                      {status > 3 && (
+                        <span className="rounded-lg bg-indigo-600 text-white px-2.5 py-1.5 text-xs font-extrabold shadow-xs">
+                          {status} Meals
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -794,17 +963,16 @@ export function DailyMealSheet() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Utensils className="h-4 w-4 text-emerald-600" />
-            Monthly Present Days Summary ({formatMonthTitle(selectedMonthId)})
+            Monthly Meal Counts Summary ({formatMonthTitle(selectedMonthId)})
           </CardTitle>
           <CardDescription>
-            Total days present for each member this month (Present = 1, Absent =
-            0).
+            Total accumulated meals for each member this month (including fractional and guest meals).
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {members.map((member) => {
-              const totalDays = khataMemberTotals[member.uid] ?? 0;
+              const totalMeals = khataMemberTotals[member.uid] ?? 0;
               return (
                 <div
                   key={member.uid}
@@ -815,15 +983,15 @@ export function DailyMealSheet() {
                       {member.name}
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Present: {totalDays} / {monthDays.length} days
+                      Accumulated: {totalMeals} meals
                     </p>
                   </div>
                   <div className="text-right">
                     <span className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                      {totalDays}
+                      {totalMeals}
                     </span>
                     <span className="block text-[10px] uppercase text-slate-400">
-                      Days (Meals)
+                      Meals
                     </span>
                   </div>
                 </div>
@@ -832,6 +1000,17 @@ export function DailyMealSheet() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Vacation / Date-Range Meal Off Modal */}
+      <MealOffModal
+        open={mealOffOpen}
+        onClose={() => setMealOffOpen(false)}
+        members={members}
+        canManage={canManage}
+        currentUserId={user?.uid || ""}
+        selectedMonthId={selectedMonthId}
+        onApplyRange={handleApplyRange}
+      />
     </div>
   );
 }

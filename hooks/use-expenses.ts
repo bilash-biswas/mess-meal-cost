@@ -60,6 +60,8 @@ export function useExpenses() {
       expenseType: ExpenseType;
       splitMode?: SharedSplitMode;
       customShares?: Record<string, number>;
+      sharedMemberIds?: string[];
+      isRecurring?: boolean;
       description: string;
       receiptFile?: File | null;
     }): Promise<MessExpense> => {
@@ -100,6 +102,8 @@ export function useExpenses() {
         expenseType: input.expenseType,
         splitMode: input.splitMode,
         customShares: input.customShares,
+        sharedMemberIds: input.sharedMemberIds,
+        isRecurring: input.isRecurring,
         description: input.description,
         receiptUrl,
         createdBy: user.uid,
@@ -120,6 +124,8 @@ export function useExpenses() {
         expenseType: ExpenseType;
         splitMode?: SharedSplitMode;
         customShares?: Record<string, number>;
+        sharedMemberIds?: string[];
+        isRecurring?: boolean;
         description: string;
         receiptFile?: File | null;
         existingReceiptUrl?: string | null;
@@ -160,6 +166,8 @@ export function useExpenses() {
         expenseType: input.expenseType,
         splitMode: input.splitMode,
         customShares: input.customShares,
+        sharedMemberIds: input.sharedMemberIds,
+        isRecurring: input.isRecurring,
         description: input.description,
         receiptUrl,
         isMonthClosed,

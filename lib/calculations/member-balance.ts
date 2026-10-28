@@ -160,6 +160,7 @@ export interface MonthlyAccountingInput {
     createdBy?: string;
     splitMode?: SharedSplitMode;
     customShares?: Record<string, number>;
+    sharedMemberIds?: string[];
   }>;
   payments: Array<{
     userId: string;
@@ -215,6 +216,16 @@ export function calculateMonthlyAccounting(
           if (Number.isFinite(share) && share > 0) {
             perExpenseCustomMap[uid] = (perExpenseCustomMap[uid] ?? 0) + share;
           }
+        }
+      } else if (
+        exp.splitMode === "subset" &&
+        exp.sharedMemberIds &&
+        exp.sharedMemberIds.length > 0
+      ) {
+        totalCustomOtherExpense += amt;
+        const perMember = roundCurrency(amt / exp.sharedMemberIds.length);
+        for (const uid of exp.sharedMemberIds) {
+          perExpenseCustomMap[uid] = (perExpenseCustomMap[uid] ?? 0) + perMember;
         }
       } else {
         totalEqualOtherExpense += amt;

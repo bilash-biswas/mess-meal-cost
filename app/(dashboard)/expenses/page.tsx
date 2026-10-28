@@ -44,7 +44,9 @@ export default function ExpensesPage() {
     null
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "meal" | "other">("all");
+  const [typeFilter, setTypeFilter] = useState<
+    "all" | "meal" | "other" | "recurring"
+  >("all");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const categoryLabelMap = useMemo(() => {
@@ -54,7 +56,9 @@ export default function ExpensesPage() {
   const filteredExpenses = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return expenses.filter((exp) => {
-      if (typeFilter !== "all" && exp.expenseType !== typeFilter) return false;
+      if (typeFilter === "meal" && exp.expenseType !== "meal") return false;
+      if (typeFilter === "other" && exp.expenseType !== "other") return false;
+      if (typeFilter === "recurring" && !exp.isRecurring) return false;
       if (!q) return true;
       return (
         exp.description.toLowerCase().includes(q) ||
@@ -179,15 +183,16 @@ export default function ExpensesPage() {
                 {(
                   [
                     { key: "all", label: "All" },
-                    { key: "meal", label: "Meal" },
-                    { key: "other", label: "Shared" },
+                    { key: "meal", label: "Bazar (Meal)" },
+                    { key: "other", label: "Shared Bills" },
+                    { key: "recurring", label: "Recurring" },
                   ] as const
                 ).map((tab) => (
                   <button
                     key={tab.key}
                     type="button"
                     onClick={() => setTypeFilter(tab.key)}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                       typeFilter === tab.key
                         ? "bg-emerald-600 text-white"
                         : "text-slate-600 dark:text-slate-400"
@@ -250,6 +255,29 @@ export default function ExpensesPage() {
                             ? `${catMeta.label} (${catMeta.bengaliHint})`
                             : exp.category}
                         </Badge>
+                        {exp.isRecurring && (
+                          <Badge variant="warning" className="text-[10px]">
+                            Recurring Bill
+                          </Badge>
+                        )}
+                        {exp.expenseType === "other" &&
+                          exp.splitMode === "subset" && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700"
+                            >
+                              Shared by {exp.sharedMemberIds?.length || 0}
+                            </Badge>
+                          )}
+                        {exp.expenseType === "other" &&
+                          exp.splitMode === "custom" && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-700"
+                            >
+                              Custom Shares
+                            </Badge>
+                          )}
                       </div>
                       <p className="text-xs text-slate-500">
                         {formatReadableDate(exp.date)} • Added & Paid by{" "}
