@@ -118,10 +118,10 @@ export function ExpenseFormModal({
       setErrorMsg("Unable to identify current member.");
       return;
     }
-    if (description.trim().length < 2) {
-      setErrorMsg("Please enter a short description (e.g. Vegetables + potatoes).");
-      return;
-    }
+    const resolvedDesc =
+      description.trim() ||
+      EXPENSE_CATEGORIES.find((c) => c.value === category)?.label ||
+      "Bazar Expense";
 
     setSubmitting(true);
     try {
@@ -132,7 +132,7 @@ export function ExpenseFormModal({
           amount: numAmount,
           paidBy: resolvedPayerId,
           expenseType,
-          description: description.trim(),
+          description: resolvedDesc,
           receiptFile,
           existingReceiptUrl: editingExpense.receiptUrl,
         });
@@ -143,7 +143,7 @@ export function ExpenseFormModal({
           amount: numAmount,
           paidBy: resolvedPayerId,
           expenseType,
-          description: description.trim(),
+          description: resolvedDesc,
           receiptFile,
         });
       }
@@ -266,14 +266,22 @@ export function ExpenseFormModal({
 
         {/* Expense Type Selector */}
         <div className="space-y-1.5">
-          <Label>Expense Type (হিসাবের ধরন)</Label>
+          <div className="flex items-center justify-between">
+            <Label>Expense Type (হিসাবের ধরন)</Label>
+            {EXPENSE_CATEGORIES.find((c) => c.value === category)?.group === "food" &&
+              expenseType === "other" && (
+                <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                  💡 পরামর্শ: সবজি/খাবারের জন্য &quot;Meal Expense&quot; সিলেক্ট করুন
+                </span>
+              )}
+          </div>
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => setExpenseType("meal")}
               className={`rounded-xl border p-3 text-left transition-colors cursor-pointer ${
                 expenseType === "meal"
-                  ? "border-emerald-600 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+                  ? "border-emerald-600 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 shadow-xs"
                   : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
               }`}
             >
@@ -287,7 +295,7 @@ export function ExpenseFormModal({
               onClick={() => setExpenseType("other")}
               className={`rounded-xl border p-3 text-left transition-colors cursor-pointer ${
                 expenseType === "other"
-                  ? "border-blue-600 bg-blue-500/10 text-blue-900 dark:text-blue-200"
+                  ? "border-blue-600 bg-blue-500/10 text-blue-900 dark:text-blue-200 shadow-xs"
                   : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
               }`}
             >
@@ -302,13 +310,15 @@ export function ExpenseFormModal({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="exp-desc">Description</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="exp-desc">Description (বিবরণ)</Label>
+            <span className="text-[11px] text-slate-400">ঐচ্ছিক / Optional</span>
+          </div>
           <Input
             id="exp-desc"
-            placeholder="e.g. Vegetables + potatoes"
+            placeholder="যেমন: আলু, পটল, পেঁয়াজ (খালি রাখলে ক্যাটাগরির নাম বসবে)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            required
           />
         </div>
 
